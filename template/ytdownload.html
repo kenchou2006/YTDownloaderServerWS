@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YouTube Video Downloader</title>
+    {% load static %}
+    <link rel="shortcut icon" href="https://www.youtube.com/s/desktop/2e540ce9/img/favicon.ico" />
+</head>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-Y4SJ5R366F"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-Y4SJ5R366F');
+</script>
+
+<body>
+<h1>YouTube Video Downloader</h1>
+<form id="downloadForm" method="post" action="{% url 'ytdownload' %}">
+    {% csrf_token %}
+    <label for="video_url">Video URL:</label>
+    <input type="text" id="video_url" name="video_url" value="{{ video_url }}" required>
+    <button id="downloadButton" type="submit">Get</button>
+</form>
+
+<div id="loading" style="display:none;">
+    <p>Loading...</p>
+</div>
+
+<div id="videoInfo" style="display:none;"></div>
+
+<div id="error" style="display:none;">
+    <p>Error occurred. <a href="#" onclick="location.reload();">Reload</a> the page</p>
+</div>
+
+<script>
+    let socket;
+    document.getElementById('downloadForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        const form = this;
+        const formData = new FormData(form);
+
+        document.getElementById('downloadButton').disabled = true;
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('videoInfo').style.display = 'none';
+        document.getElementById('error').style.display = 'none';
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const socketUrl = `${protocol}//${window.location.host}/ws/video_download/`;
+        socket = new WebSocket(socketUrl);
+        socket.onopen = function(e) {
+            console.log("WebSocket connection established");
+            socket.send(JSON.stringify({
+                'video_url': formData.get('video_url')
+            }));
+        };
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            document.getElementById('loading').style.display = 'none';
+
+            if (data.error) {
+                document.getElementById('error').style.display = 'block';
+            } else if (data.video_info) {
+                const videoInfoDiv = document.getElementById('videoInfo');
+                videoInfoDiv.innerHTML = `
+                    <h2>${data.video_info.video_title}</h2>
+                    <p>Views: ${data.video_info.views}</p>
+                    <p>Publish Date: ${new Date(data.video_info.publish_date).toLocaleDateString('en-US')}</p>
+                    <p>Thumbnail: <a href="${data.video_info.thumbnail_url}" download>Download</a></p>
+                    <h3>Video Streams:</h3>
+                    <ul>
+                        ${data.video_info.streams_info.map(stream => `
+                            <li>
+                                Type: ${stream.type}, ${stream.resolution ? 'Resolution: ' + stream.resolution + ',' : ''}
+                                ${stream.quality ? 'Quality: ' + stream.quality + ',' : ''} Subtype: ${stream.subtype},
+                                Filesize: ${stream.filesize} MB
+                                <a href="${stream.url}" download>Download</a>
+                            </li>
+                        `).join('')}
+                    </ul>
+                `;
+                videoInfoDiv.style.display = 'block';
+            }
+            socket.close();
+        };
+        socket.onclose = function(e) {
+            console.log("WebSocket connection closed");
+            document.getElementById('downloadButton').disabled = false;
+        };
+        socket.onerror = function(e) {
+            console.error("WebSocket Error: ", e);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+        };
+    });
+</script>
+
+</body>
+</html>

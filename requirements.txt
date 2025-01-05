@@ -1,0 +1,7 @@
+Django
+yt-dlp
+ffmpeg
+channels
+websockets
+gunicorn
+uvicorn

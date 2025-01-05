@@ -1,0 +1,15 @@
+runtime: python312
+instance_class: F1
+env: flex
+
+entrypoint: gunicorn web.asgi:application  --bind :$PORT -w 4 -k uvicorn.workers.UvicornWorker
+
+handlers:
+- url: /.*
+  script: auto
+
+inbound_services:
+  - warmup
+
+network:
+  session_affinity: true
